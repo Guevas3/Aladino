@@ -1,36 +1,34 @@
 import Link from "next/link";
 import { db } from "@/lib/db";
-import { expenses } from "@/db/schema";
+import { expenses, bookings } from "@/db/schema";
 import { revalidatePath } from "next/cache";
-import { DollarSign, Tag, Calendar as CalendarIcon, ArrowLeft } from "lucide-react";
+import { DollarSign, Tag, Calendar as CalendarIcon, ArrowLeft, Users, Plus } from "lucide-react";
 import { ExpenseItem } from "@/components/ExpenseItem";
+import { sql, eq, and } from "drizzle-orm";
+import { addExpense } from "@/app/actions";
 
 
 export default async function FinancePage() {
-    const allExpenses = await db.select().from(expenses);
+    const allMovements = await db.select().from(expenses).where(eq(expenses.isExcludedFromStats, false));
 
-    const totalExpenses = allExpenses.reduce((sum, item) => sum + Number(item.amount), 0);
+    const totalExpenses = allMovements
+        .filter(m => m.type === 'expense')
+        .reduce((sum, item) => sum + Number(item.amount), 0);
 
-    async function addExpense(formData: FormData) {
-        "use server";
-        const description = formData.get("description") as string;
-        const amount = formData.get("amount") as string;
-        const category = formData.get("category") as string;
+    const otherIncome = allMovements
+        .filter(m => m.type === 'income')
+        .reduce((sum, item) => sum + Number(item.amount), 0);
 
-        await db.insert(expenses).values({
-            description,
-            amount,
-            category,
-            date: new Date() // defaults to now
-        });
+    // Fetch totals from bookings
+    const totalRevenueResult = await db.select({ total: sql<number>`sum(${bookings.totalAmount})` }).from(bookings).where(and(sql`(status != 'cancelled' OR status IS NULL)`, eq(bookings.isExcludedFromStats, false)));
+    const totalDepositsResult = await db.select({ total: sql<number>`sum(${bookings.depositAmount})` }).from(bookings).where(eq(bookings.isExcludedFromStats, false));
 
-        revalidatePath("/finance");
-        revalidatePath("/");
-    }
+    const revenue = Number(totalRevenueResult[0]?.total || 0);
+    const deposits = Number(totalDepositsResult[0]?.total || 0);
 
     return (
         <div className="min-h-screen bg-background p-8">
-            <div className="max-w-4xl mx-auto">
+            <div className="max-w-5xl mx-auto">
                 <div className="mb-6 flex items-center gap-4">
                     <Link href="/" className="p-2 -ml-2 text-muted-foreground hover:text-primary hover:bg-primary/5 rounded-full transition-colors">
                         <ArrowLeft size={24} />
@@ -38,24 +36,54 @@ export default async function FinancePage() {
                     <h1 className="text-2xl font-bold text-primary">Gestión Financiera</h1>
                 </div>
 
-                <div className="mb-8">
-                    <div className="bg-card p-6 rounded-xl border border-secondary shadow-sm w-full md:w-1/3">
-                        <p className="text-sm font-medium text-muted-foreground">Gastos Totales</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                    <div className="bg-card p-6 rounded-xl border border-border shadow-sm">
+                        <div className="flex items-center gap-2 text-muted-foreground mb-2">
+                            <DollarSign size={16} className="text-primary" />
+                            <p className="text-sm font-medium">Ingresos Reservas</p>
+                        </div>
+                        <p className="text-2xl font-bold text-primary">${revenue.toLocaleString()}</p>
+                    </div>
 
-                        <p className="text-3xl font-bold text-destructive mt-2">-${totalExpenses.toLocaleString()}</p>
+                    <div className="bg-card p-6 rounded-xl border border-border shadow-sm">
+                        <div className="flex items-center gap-2 text-muted-foreground mb-2">
+                            <Users size={16} className="text-accent-foreground" />
+                            <p className="text-sm font-medium">Total Señas</p>
+                        </div>
+                        <p className="text-2xl font-bold text-foreground">${deposits.toLocaleString()}</p>
+                    </div>
+
+                    <div className="bg-card p-6 rounded-xl border border-border shadow-sm">
+                        <div className="flex items-center gap-2 text-muted-foreground mb-2">
+                            <Plus size={16} className="text-green-500" />
+                            <p className="text-sm font-medium">Otros Ingresos</p>
+                        </div>
+                        <p className="text-2xl font-bold text-green-600">${otherIncome.toLocaleString()}</p>
+                    </div>
+
+                    <div className="bg-card p-6 rounded-xl border border-secondary shadow-sm">
+                        <div className="flex items-center gap-2 text-muted-foreground mb-2">
+                            <DollarSign size={16} className="text-destructive" />
+                            <p className="text-sm font-medium">Gastos Totales</p>
+                        </div>
+                        <p className="text-2xl font-bold text-destructive">-${Math.abs(totalExpenses).toLocaleString()}</p>
                     </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                     {/* List */}
-                    <div className="md:col-span-2 space-y-4">
-                        {allExpenses.length === 0 ? (
+                    <div className="lg:col-span-2 space-y-4">
+                        <h3 className="font-semibold text-lg text-foreground mb-2">Movimientos Recientes</h3>
+                        {allMovements.length === 0 ? (
                             <div className="bg-card p-8 rounded-xl border border-dashed border-border text-center">
-                                <p className="text-muted-foreground">No hay gastos registrados.</p>
+                                <p className="text-muted-foreground">No hay movimientos registrados.</p>
                             </div>
                         ) : (
-                            allExpenses.map((expense) => (
-                                <ExpenseItem key={expense.id} expense={expense} />
+                            allMovements.sort((a, b) => (b.date?.getTime() || 0) - (a.date?.getTime() || 0)).map((movement) => (
+                                <ExpenseItem key={movement.id} expense={{
+                                    ...movement,
+                                    type: movement.type as any
+                                }} />
                             ))
 
                         )}
@@ -63,12 +91,18 @@ export default async function FinancePage() {
 
                     {/* Form */}
                     <div className="bg-card p-6 rounded-xl border border-border shadow-sm h-fit">
-                        <h3 className="font-semibold text-lg mb-4 text-primary">Agregar Gasto</h3>
+                        <h3 className="font-semibold text-lg mb-4 text-primary">Nuevo Movimiento</h3>
                         <form action={addExpense} className="space-y-4">
-
+                            <div>
+                                <label className="block text-sm font-medium text-foreground mb-1">Tipo</label>
+                                <select name="type" required className="w-full border border-border rounded-md p-2 text-sm bg-background text-foreground">
+                                    <option value="expense">Egreso (Gasto)</option>
+                                    <option value="income">Ingreso (Extra)</option>
+                                </select>
+                            </div>
                             <div>
                                 <label className="block text-sm font-medium text-foreground mb-1">Descripción</label>
-                                <input name="description" type="text" required className="w-full border border-border rounded-md p-2 text-sm bg-background text-foreground" placeholder="Alquiler, Insumos..." />
+                                <input name="description" type="text" required className="w-full border border-border rounded-md p-2 text-sm bg-background text-foreground" placeholder="Ej: Vuelo de globos, Limpieza..." />
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-foreground mb-1">Categoría</label>
@@ -76,6 +110,7 @@ export default async function FinancePage() {
                                     <option>Mantenimiento</option>
                                     <option>Insumos</option>
                                     <option>Servicios</option>
+                                    <option>Ventas</option>
                                     <option>Alquiler</option>
                                     <option>Otros</option>
                                 </select>
@@ -88,7 +123,7 @@ export default async function FinancePage() {
                                 </div>
                             </div>
                             <button type="submit" className="w-full bg-primary text-primary-foreground py-2 rounded-md hover:bg-primary/90 transition-colors shadow-md">
-                                Agregar Gasto
+                                Registrar Movimiento
                             </button>
 
                         </form>

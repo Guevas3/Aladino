@@ -4,6 +4,34 @@ import { db } from "@/lib/db";
 import { bookings, expenses } from "@/db/schema";
 import { revalidatePath } from "next/cache";
 import { eq } from "drizzle-orm";
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
+
+const USER = process.env.ADMIN_USER || "matias";
+const PASS = process.env.ADMIN_PASSWORD || "aladinopelotero";
+
+export async function login(formData: FormData) {
+    const username = formData.get("username") as string;
+    const password = formData.get("password") as string;
+
+    if (username === USER && password === PASS) {
+        // Set cookie
+        (await cookies()).set("auth_session", "true", {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === "production",
+            maxAge: 60 * 60 * 24 * 7, // 1 week
+            path: "/",
+        });
+        redirect("/");
+    } else {
+        return { error: "Credenciales inválidas" };
+    }
+}
+
+export async function logout() {
+    (await cookies()).delete("auth_session");
+    redirect("/login");
+}
 
 export async function addBooking(formData: FormData) {
     const clientName = formData.get("clientName") as string;
@@ -54,15 +82,47 @@ export async function cancelBooking(id: number) {
     revalidatePath("/");
 }
 
+export async function completeBooking(id: number) {
+    if (!id) throw new Error("ID required");
+
+    await db.update(bookings)
+        .set({ status: 'completed' })
+        .where(eq(bookings.id, id));
+
+    revalidatePath("/bookings");
+    revalidatePath("/");
+}
+
+export async function clearRecentBookings() {
+    await db.update(bookings)
+        .set({ isArchived: true });
+
+    revalidatePath("/");
+    revalidatePath("/bookings");
+}
+
+export async function resetFinancialStats() {
+    await db.update(bookings)
+        .set({ isExcludedFromStats: true });
+
+    await db.update(expenses)
+        .set({ isExcludedFromStats: true });
+
+    revalidatePath("/");
+    revalidatePath("/finance");
+}
+
 export async function addExpense(formData: FormData) {
     const description = formData.get("description") as string;
     const amount = formData.get("amount") as string;
     const category = formData.get("category") as string;
+    const type = (formData.get("type") as 'income' | 'expense') || 'expense';
 
     await db.insert(expenses).values({
         description,
         amount,
         category,
+        type,
         date: new Date()
     });
 

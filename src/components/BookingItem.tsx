@@ -14,7 +14,7 @@ import {
     AlertDialogTitle,
     AlertDialogTrigger
 } from "@/components/ui/alert-dialog";
-import { cancelBooking, updateBookingBudget } from "@/app/actions";
+import { cancelBooking, completeBooking, updateBookingBudget } from "@/app/actions";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 
@@ -28,7 +28,7 @@ type Booking = {
     status: string | null;
 };
 
-export function BookingItem({ booking }: { booking: Booking }) {
+export function BookingItem({ booking, compact = false }: { booking: Booking, compact?: boolean }) {
     const [openEdit, setOpenEdit] = useState(false);
     const [isPending, setIsPending] = useState(false);
 
@@ -39,6 +39,18 @@ export function BookingItem({ booking }: { booking: Booking }) {
         } catch (e) {
             console.error(e);
             alert("Failed to cancel");
+        } finally {
+            setIsPending(false);
+        }
+    }
+
+    async function handleComplete() {
+        setIsPending(true);
+        try {
+            await completeBooking(booking.id);
+        } catch (e) {
+            console.error(e);
+            alert("Failed to complete");
         } finally {
             setIsPending(false);
         }
@@ -61,38 +73,71 @@ export function BookingItem({ booking }: { booking: Booking }) {
 
     return (
         <div className={cn(
-            "bg-card p-6 rounded-xl border border-border shadow-sm flex justify-between items-center transition-all",
+            "bg-card p-4 rounded-xl border border-border shadow-sm flex flex-col transition-all",
+            !compact && "sm:flex-row sm:items-center justify-between gap-4",
+            compact && "gap-3",
             booking.status === 'cancelled' && "opacity-60 grayscale bg-muted/30"
         )}>
-            <div>
-                <h3 className={cn("font-semibold text-lg text-foreground", booking.status === 'cancelled' && "line-through")}>
+            <div className="flex-1 min-w-0">
+                <h3 className={cn(
+                    "font-bold text-foreground truncate",
+                    compact ? "text-base" : "text-lg",
+                    booking.status === 'cancelled' && "line-through"
+                )}>
                     {booking.clientName}
                 </h3>
-                <div className="flex items-center gap-4 text-sm text-muted-foreground mt-1">
-                    <span className="flex items-center gap-1"><CalendarIcon size={14} /> {format(new Date(booking.date), "P")}</span>
-                    <span className="flex items-center gap-1"><Clock size={14} /> {booking.timeSlot}</span>
+                <div className={cn(
+                    "flex items-center gap-2 text-muted-foreground mt-1 flex-wrap",
+                    compact ? "text-xs" : "text-sm"
+                )}>
+                    <span className="flex items-center gap-1 whitespace-nowrap"><CalendarIcon size={12} /> {format(new Date(booking.date), "P")}</span>
+                    <span className="flex items-center gap-1 whitespace-nowrap"><Clock size={12} /> {booking.timeSlot}</span>
                 </div>
             </div>
 
-            <div className="flex items-center gap-4">
-                <div className="text-right">
+            <div className={cn(
+                "flex items-center justify-between gap-4 pt-3 border-t border-border/50",
+                !compact && "sm:pt-0 sm:border-t-0 sm:justify-end w-full sm:w-auto",
+                compact && "w-full"
+            )}>
+                <div className={cn(
+                    "flex flex-col",
+                    !compact && "sm:text-right"
+                )}>
                     <span className={cn(
-                        "inline-block px-2 py-1 text-xs rounded-full font-medium mb-1",
-                        booking.status === 'confirmed' ? "bg-green-100 text-green-700" :
-                            booking.status === 'cancelled' ? "bg-red-100 text-red-700" : "bg-gray-100 text-gray-700"
+                        "inline-block px-2 py-0.5 text-[10px] rounded-full font-medium mb-1 capitalize w-fit",
+                        !compact && "sm:ml-auto",
+                        booking.status === 'confirmed' ? "bg-blue-100 text-blue-700" :
+                            booking.status === 'completed' ? "bg-green-100 text-green-700" :
+                                booking.status === 'cancelled' ? "bg-red-100 text-red-700" : "bg-gray-100 text-gray-700"
                     )}>
-                        {booking.status}
+                        {booking.status === 'confirmed' ? 'confirmada' :
+                            booking.status === 'completed' ? 'completada' :
+                                booking.status === 'cancelled' ? 'cancelada' : 'pendiente'}
                     </span>
-                    <p className="font-bold text-foreground py-1">${booking.totalAmount}</p>
-                    <p className="text-xs text-muted-foreground">Seña: ${booking.depositAmount}</p>
+                    <p className={cn(
+                        "font-bold text-foreground",
+                        compact ? "text-base" : "text-lg sm:text-xl"
+                    )}>${Math.abs(Number(booking.totalAmount)).toLocaleString()}</p>
+                    <p className="text-[10px] text-muted-foreground whitespace-nowrap">Seña: ${Math.abs(Number(booking.depositAmount)).toLocaleString()}</p>
                 </div>
 
                 {/* Actions */}
-                {booking.status !== 'cancelled' && (
-                    <div className="flex gap-2 pl-4 border-l border-border">
+                {booking.status !== 'cancelled' && booking.status !== 'completed' && (
+                    <div className="flex gap-1 pl-3 border-l border-border h-fit my-auto">
+                        {booking.status === 'confirmed' && (
+                            <button
+                                onClick={handleComplete}
+                                disabled={isPending}
+                                className="p-1.5 text-muted-foreground hover:text-green-600 hover:bg-green-50 rounded-md transition-colors"
+                                title="Marcar como Completada"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-check-circle"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" /></svg>
+                            </button>
+                        )}
                         <Popover open={openEdit} onOpenChange={setOpenEdit}>
                             <PopoverTrigger asChild>
-                                <button className="p-2 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-md transition-colors" title="Editar Presupuesto">
+                                <button className="p-1.5 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-md transition-colors" title="Editar Presupuesto">
                                     <Edit2 size={16} />
                                 </button>
                             </PopoverTrigger>
@@ -122,7 +167,7 @@ export function BookingItem({ booking }: { booking: Booking }) {
 
                         <AlertDialog>
                             <AlertDialogTrigger asChild>
-                                <button disabled={isPending} className="p-2 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-md transition-colors" title="Cancelar Reserva">
+                                <button disabled={isPending} className="p-1.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-md transition-colors" title="Cancelar Reserva">
                                     <Trash2 size={16} />
                                 </button>
                             </AlertDialogTrigger>

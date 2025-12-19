@@ -60,7 +60,7 @@ export function DashboardCalendar({ bookings }: { bookings: Booking[] }) {
                     <span>Fecha Reservada</span>
                 </div>
 
-                <PopoverContent className="w-80 p-0" align="start" side="right">
+                <PopoverContent className="w-80 p-0" align="center" side="bottom" sideOffset={10}>
                     <div className="p-4 border-b border-border bg-muted/50">
                         <h4 className="font-semibold text-foreground">{date ? format(date, "PPPP") : "Selecciona una fecha"}</h4>
                         <p className="text-xs text-muted-foreground">{selectedBookings.length} reserva(s)</p>

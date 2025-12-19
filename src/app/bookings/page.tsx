@@ -2,7 +2,7 @@ import Link from "next/link";
 import { db } from "@/lib/db";
 import { bookings } from "@/db/schema";
 import { BookingForm } from "@/components/BookingForm";
-import { BookingItem } from "@/components/BookingItem";
+import { BookingList } from "@/components/BookingList";
 import { CalendarIcon, Clock, ArrowLeft } from "lucide-react";
 
 export const dynamic = 'force-dynamic';
@@ -25,31 +25,19 @@ export default async function BookingsPage() {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                    {/* List */}
-                    <div className="md:col-span-2 space-y-4">
-                        {allBookings.length === 0 ? (
-                            <div className="bg-card p-8 rounded-xl border border-dashed border-border text-center">
-                                <p className="text-muted-foreground">No hay reservas aún.</p>
-                            </div>
-
-                        ) : (
-                            allBookings.map((booking) => (
-                                <BookingItem key={booking.id} booking={{
-                                    ...booking,
-                                    // Ensure numeric fields are strings as implied by schema usage (or fix schema types)
-                                    // Drizzle numeric returns string.
-                                    status: booking.status || 'pending' // Handle null status
-                                }} />
-                            ))
-                        )}
-                    </div>
-
-                    {/* Form Component */}
+                    {/* Form Component - Now first in order */}
                     <div className="bg-card p-6 rounded-xl border border-border shadow-sm h-fit">
                         <h3 className="font-semibold text-lg mb-4 text-primary">Nueva Reserva</h3>
                         <BookingForm bookedDates={bookedDates} />
                     </div>
 
+                    {/* List - Now second in order */}
+                    <div className="md:col-span-2">
+                        <BookingList bookings={allBookings.map(b => ({
+                            ...b,
+                            status: b.status || 'pending'
+                        }))} />
+                    </div>
                 </div>
             </div>
         </div>

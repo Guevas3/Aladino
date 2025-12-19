@@ -2,20 +2,28 @@ import Link from "next/link";
 import { Calendar as CalendarIcon, DollarSign, Users, Plus, Clock } from "lucide-react";
 import { db } from "@/lib/db";
 import { bookings } from "@/db/schema";
-import { desc, sql } from "drizzle-orm";
+import { desc, sql, eq, and } from "drizzle-orm";
 import { DashboardCalendar } from "@/components/DashboardCalendar";
+import { logout } from "@/app/actions";
+import { LogOut, Edit2 } from "lucide-react";
+import { BookingItem } from "@/components/BookingItem";
+import { ClearListButton, ResetFinancialsButton } from "@/components/DashboardActions";
+
 
 export const dynamic = 'force-dynamic';
 
 export default async function Dashboard() {
   // Fetch real data
-  const upcomingEventsCount = await db.select({ count: sql<number>`count(*)` }).from(bookings).where(sql`status = 'confirmed'`);
-  const totalRevenueResult = await db.select({ total: sql<number>`sum(${bookings.totalAmount})` }).from(bookings);
-  const totalDepositsResult = await db.select({ total: sql<number>`sum(${bookings.depositAmount})` }).from(bookings);
+  const upcomingEventsCount = await db.select({ count: sql<number>`count(*)` }).from(bookings).where(and(eq(bookings.status, 'confirmed'), eq(bookings.isExcludedFromStats, false)));
+  const totalRevenueResult = await db.select({ total: sql<number>`sum(${bookings.totalAmount})` }).from(bookings).where(and(sql`(status != 'cancelled' OR status IS NULL)`, eq(bookings.isExcludedFromStats, false)));
+  const totalDepositsResult = await db.select({ total: sql<number>`sum(${bookings.depositAmount})` }).from(bookings).where(eq(bookings.isExcludedFromStats, false));
 
 
   // Recent bookings
-  const recentBookings = await db.select().from(bookings).orderBy(desc(bookings.date)).limit(5);
+  const recentBookings = await db.select().from(bookings).where(eq(bookings.isArchived, false)).orderBy(desc(bookings.date)).limit(5);
+
+  // Confirmed bookings for the bottom of the calendar
+  const confirmedBookings = await db.select().from(bookings).where(and(eq(bookings.status, 'confirmed'), eq(bookings.isArchived, false))).orderBy(desc(bookings.date));
 
   // All booked dates for calendar (exclude cancelled)
   const allBookings = await db.select().from(bookings).where(sql`status != 'cancelled' OR status IS NULL`);
@@ -30,10 +38,15 @@ export default async function Dashboard() {
     <div className="min-h-screen bg-background text-foreground">
       {/* Navbar */}
       <nav className="border-b border-border bg-card px-6 py-4 flex items-center justify-between">
-        <h1 className="text-xl font-bold text-primary">Gestor de Pelotero</h1>
-        <div className="flex gap-4">
+        <h1 className="text-xl font-bold text-primary">Aladino Pelotero</h1>
+        <div className="flex items-center gap-4">
           <Link href="/bookings" className="text-muted-foreground hover:text-primary font-medium transition-colors">Reservas</Link>
           <Link href="/finance" className="text-muted-foreground hover:text-primary font-medium transition-colors">Finanzas</Link>
+          <form action={logout}>
+            <button className="text-muted-foreground hover:text-destructive transition-colors" title="Cerrar Sesión">
+              <LogOut size={20} />
+            </button>
+          </form>
         </div>
       </nav>
 
@@ -53,11 +66,21 @@ export default async function Dashboard() {
           </div>
         </header>
 
-        {/* Stats Grid */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <StatCard title="Eventos Confirmados" value={String(upcomingCount)} icon={<CalendarIcon className="text-primary" />} />
-          <StatCard title="Ingresos Totales" value={`$${revenue}`} icon={<DollarSign className="text-secondary-foreground" />} />
-          <StatCard title="Total Señas" value={`$${deposits}`} icon={<Users className="text-accent-foreground" />} />
+          <StatCard
+            title="Ingresos Totales"
+            value={`$${revenue}`}
+            icon={<DollarSign className="text-secondary-foreground" />}
+            editHref="/bookings"
+          />
+          <StatCard
+            title="Total Señas"
+            value={`$${deposits}`}
+            icon={<Users className="text-accent-foreground" />}
+            editHref="/bookings"
+          />
+          <ResetFinancialsButton />
         </div>
 
 
@@ -65,34 +88,50 @@ export default async function Dashboard() {
           {/* Dashboard Calendar - Takes up 1 column on large screens */}
           <div className="lg:col-span-1">
             {/* Passed full bookings array now */}
-            <DashboardCalendar bookings={allBookings} />
+            <DashboardCalendar bookings={allBookings.map(b => ({
+              ...b,
+              status: b.status || 'pending'
+            }))} />
+
+            {/* Confirmed Bookings list at the bottom of calendar */}
+            <div className="mt-8 bg-card rounded-xl shadow-sm border border-border p-6">
+              <h3 className="font-semibold text-lg mb-4 text-foreground flex items-center gap-2">
+                <div className="w-2 h-2 bg-blue-500 rounded-full" />
+                Próximas Confirmadas
+              </h3>
+              <div className="space-y-4">
+                {confirmedBookings.length === 0 ? (
+                  <p className="text-muted-foreground text-sm text-center py-4">No hay reservas confirmadas.</p>
+                ) : (
+                  confirmedBookings.map(booking => (
+                    <BookingItem key={booking.id} compact={true} booking={{
+                      ...booking,
+                      status: booking.status || 'pending'
+                    }} />
+                  ))
+                )}
+              </div>
+            </div>
           </div>
 
-          {/* Recent Activity / List - Takes up 2 columns */}
+          {/* Recent Activity / List - Right column on LG */}
           <div className="lg:col-span-2">
-            <div className="bg-card rounded-xl shadow-sm border border-border p-6 h-full">
-              <h3 className="font-semibold text-lg mb-4 text-foreground">Reservas Recientes</h3>
-              <div className="space-y-4">
+            <div className="bg-card rounded-xl shadow-sm border border-border p-4 sm:p-6 h-full">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-semibold text-lg text-foreground">Reservas Recientes</h3>
+                <ClearListButton />
+              </div>
+              <div className="space-y-3 sm:space-y-4">
                 {recentBookings.length === 0 ? (
                   <div className="p-8 text-center border-2 border-dashed border-muted rounded-lg">
                     <p className="text-muted-foreground text-sm">No hay reservas recientes.</p>
                   </div>
                 ) : (
                   recentBookings.map((booking) => (
-                    <div key={booking.id} className="flex justify-between items-center border-b border-border last:border-0 pb-4 last:pb-0">
-                      <div>
-                        <p className="font-medium text-foreground">{booking.clientName}</p>
-                        <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                          <span className="flex items-center gap-1"><CalendarIcon size={14} /> {new Date(booking.date).toLocaleDateString()}</span>
-                          <span className="flex items-center gap-1"><Clock size={14} /> {booking.timeSlot}</span>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <span className="block text-sm font-semibold text-primary">${booking.totalAmount}</span>
-                        <span className="block text-xs text-muted-foreground">Seña: ${booking.depositAmount}</span>
-                        <p className="text-xs text-muted-foreground uppercase mt-1">{booking.status}</p>
-                      </div>
-                    </div>
+                    <BookingItem key={booking.id} booking={{
+                      ...booking,
+                      status: booking.status || 'pending'
+                    }} />
                   ))
                 )}
               </div>
@@ -105,12 +144,20 @@ export default async function Dashboard() {
   );
 }
 
-function StatCard({ title, value, icon }: { title: string, value: string, icon: React.ReactNode }) {
+function StatCard({ title, value, icon, editHref }: { title: string, value: string, icon: React.ReactNode, editHref?: string }) {
   return (
-    <div className="bg-card p-6 rounded-xl border border-border shadow-sm flex items-center justify-between">
+    <div className="bg-card p-6 rounded-xl border border-border shadow-sm flex items-center justify-between relative group transition-all hover:border-primary/50">
       <div>
         <p className="text-sm font-medium text-muted-foreground">{title}</p>
         <p className="text-3xl font-bold text-foreground mt-2">{value}</p>
+        {editHref && (
+          <Link
+            href={editHref}
+            className="mt-3 flex items-center gap-1.5 text-xs text-primary font-semibold opacity-0 group-hover:opacity-100 transition-opacity hover:underline"
+          >
+            <Edit2 size={12} /> Editar Montos
+          </Link>
+        )}
       </div>
       <div className="p-4 bg-muted/20 rounded-full border border-border/50">
         {icon}
