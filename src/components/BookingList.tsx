@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { BookingItem } from "./BookingItem";
 import { Calendar, Filter } from "lucide-react";
+import { ClearHistoryButton } from "./DashboardActions";
+import { DownloadBookingsButton } from "./DownloadBookingsButton";
 
 type Booking = {
     id: number;
@@ -37,29 +39,42 @@ export function BookingList({ bookings }: { bookings: Booking[] }) {
 
     return (
         <div className="space-y-4">
-            <div className="flex items-center justify-between bg-card p-3 rounded-lg border border-border shadow-sm">
-                <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                    <Filter size={16} /> Ordenar por:
-                </span>
-                <div className="flex gap-2">
-                    <button
-                        onClick={() => setSortBy('date')}
-                        className={`px-3 py-1 text-xs rounded-full transition-all border ${sortBy === 'date'
-                            ? 'bg-primary text-primary-foreground border-primary shadow-sm'
-                            : 'bg-background text-muted-foreground border-border hover:border-primary/50'
-                            }`}
-                    >
-                        Fecha
-                    </button>
-                    <button
-                        onClick={() => setSortBy('status')}
-                        className={`px-3 py-1 text-xs rounded-full transition-all border ${sortBy === 'status'
-                            ? 'bg-primary text-primary-foreground border-primary shadow-sm'
-                            : 'bg-background text-muted-foreground border-border hover:border-primary/50'
-                            }`}
-                    >
-                        Estado
-                    </button>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-card p-4 rounded-lg border border-border shadow-sm">
+                <div className="flex items-center justify-between w-full sm:w-auto gap-4">
+                    <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                        <Filter size={16} /> Ordenar:
+                    </span>
+                    <div className="flex gap-2">
+                        <button
+                            onClick={() => setSortBy('date')}
+                            className={`px-3 py-1 text-xs rounded-full transition-all border ${sortBy === 'date'
+                                ? 'bg-primary text-primary-foreground border-primary shadow-sm'
+                                : 'bg-background text-muted-foreground border-border hover:border-primary/50'
+                                }`}
+                        >
+                            Fecha
+                        </button>
+                        <button
+                            onClick={() => setSortBy('status')}
+                            className={`px-3 py-1 text-xs rounded-full transition-all border ${sortBy === 'status'
+                                ? 'bg-primary text-primary-foreground border-primary shadow-sm'
+                                : 'bg-background text-muted-foreground border-border hover:border-primary/50'
+                                }`}
+                        >
+                            Estado
+                        </button>
+                    </div>
+                </div>
+
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
+                    <DownloadBookingsButton bookings={bookings.map(b => ({
+                        ...b,
+                        date: new Date(b.date),
+                        status: b.status || 'pending',
+                        totalAmount: b.totalAmount,
+                        depositAmount: b.depositAmount
+                    }))} />
+                    <ClearHistoryButton />
                 </div>
             </div>
 

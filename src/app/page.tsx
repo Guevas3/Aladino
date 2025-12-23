@@ -25,8 +25,8 @@ export default async function Dashboard() {
   // Confirmed bookings for the bottom of the calendar
   const confirmedBookings = await db.select().from(bookings).where(and(eq(bookings.status, 'confirmed'), eq(bookings.isArchived, false))).orderBy(desc(bookings.date));
 
-  // All booked dates for calendar (exclude cancelled)
-  const allBookings = await db.select().from(bookings).where(sql`status != 'cancelled' OR status IS NULL`);
+  // All booked dates for calendar (exclude cancelled and archived)
+  const allBookings = await db.select().from(bookings).where(and(sql`(status != 'cancelled' OR status IS NULL)`, eq(bookings.isArchived, false)));
   const bookedDates = allBookings.map(b => new Date(b.date));
 
   const upcomingCount = upcomingEventsCount[0]?.count || 0;
@@ -40,8 +40,6 @@ export default async function Dashboard() {
       <nav className="border-b border-border bg-card px-6 py-4 flex items-center justify-between">
         <h1 className="text-xl font-bold text-primary">Aladino Pelotero</h1>
         <div className="flex items-center gap-4">
-          <Link href="/bookings" className="text-muted-foreground hover:text-primary font-medium transition-colors">Reservas</Link>
-          <Link href="/finance" className="text-muted-foreground hover:text-primary font-medium transition-colors">Finanzas</Link>
           <form action={logout}>
             <button className="text-muted-foreground hover:text-destructive transition-colors" title="Cerrar Sesión">
               <LogOut size={20} />

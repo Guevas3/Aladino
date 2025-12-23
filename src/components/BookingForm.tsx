@@ -51,7 +51,6 @@ export function BookingForm({ bookedDates }: { bookedDates: Date[] }) {
                         mode="single"
                         selected={date}
                         onSelect={setDate}
-                        disabled={bookedDates}
                         modifiers={{
                             booked: bookedDates
                         }}
@@ -68,11 +67,22 @@ export function BookingForm({ bookedDates }: { bookedDates: Date[] }) {
             </div>
 
             <div>
-                <label className="block text-sm font-medium text-foreground mb-1">Horario</label>
-                <select name="timeSlot" className="w-full border border-border rounded-md p-2 text-sm bg-background text-foreground">
-                    <option>14:00 - 18:00</option>
-                    <option>18:00 - 22:00</option>
-                </select>
+                <label className="block text-sm font-medium text-foreground mb-1">Observaciones</label>
+                <textarea name="observations" rows={3} className="w-full border border-border rounded-md p-2 text-sm bg-background text-foreground resize-none" placeholder="Detalles extra (opcional)" />
+            </div>
+
+            <div>
+                <label className="block text-sm font-medium text-foreground mb-3">Horario</label>
+                <div className="grid grid-cols-2 gap-2">
+                    <div className="relative">
+                        <label className="text-xs text-muted-foreground absolute -top-5 left-0">Desde</label>
+                        <input name="startTime" type="time" defaultValue="14:00" className="w-full border border-border rounded-md p-2 text-sm bg-background text-foreground" />
+                    </div>
+                    <div className="relative">
+                        <label className="text-xs text-muted-foreground absolute -top-5 left-0">Hasta</label>
+                        <input name="endTime" type="time" defaultValue="18:00" className="w-full border border-border rounded-md p-2 text-sm bg-background text-foreground" />
+                    </div>
+                </div>
             </div>
             <div className="grid grid-cols-2 gap-2">
                 <div>

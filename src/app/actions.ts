@@ -3,7 +3,7 @@
 import { db } from "@/lib/db";
 import { bookings, expenses } from "@/db/schema";
 import { revalidatePath } from "next/cache";
-import { eq } from "drizzle-orm";
+import { eq, lt, or, inArray, and } from "drizzle-orm";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
@@ -36,9 +36,13 @@ export async function logout() {
 export async function addBooking(formData: FormData) {
     const clientName = formData.get("clientName") as string;
     const dateStr = formData.get("date") as string;
-    const timeSlot = formData.get("timeSlot") as string;
+    const startTime = formData.get("startTime") as string;
+    const endTime = formData.get("endTime") as string;
+    const timeSlot = `${startTime} - ${endTime}`;
+
     const deposit = formData.get("deposit") as string;
     const total = formData.get("total") as string;
+    const observations = formData.get("observations") as string;
 
     if (!dateStr) {
         throw new Error("Date is required");
@@ -50,7 +54,8 @@ export async function addBooking(formData: FormData) {
         timeSlot,
         depositAmount: deposit,
         totalAmount: total,
-        status: 'confirmed'
+        status: 'confirmed',
+        observations
     });
 
     revalidatePath("/bookings");
@@ -112,10 +117,33 @@ export async function resetFinancialStats() {
     revalidatePath("/finance");
 }
 
+export async function clearBookingHistory() {
+    const now = new Date();
+    await db.update(bookings)
+        .set({ isArchived: true })
+        .where(
+            or(
+                lt(bookings.date, now),
+                inArray(bookings.status, ['completed', 'cancelled'])
+            )
+        );
+
+    revalidatePath("/");
+    revalidatePath("/bookings");
+}
+
+export async function clearRecentExpenses() {
+    await db.update(expenses)
+        .set({ isArchived: true });
+
+    revalidatePath("/");
+    revalidatePath("/finance");
+}
+
 export async function addExpense(formData: FormData) {
     const description = formData.get("description") as string;
     const amount = formData.get("amount") as string;
-    const category = formData.get("category") as string;
+    const category = (formData.get("category") as string) || "General";
     const type = (formData.get("type") as 'income' | 'expense') || 'expense';
 
     await db.insert(expenses).values({

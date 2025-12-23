@@ -4,12 +4,15 @@ import { expenses, bookings } from "@/db/schema";
 import { revalidatePath } from "next/cache";
 import { DollarSign, Tag, Calendar as CalendarIcon, ArrowLeft, Users, Plus } from "lucide-react";
 import { ExpenseItem } from "@/components/ExpenseItem";
+import { ClearFinanceListButton } from "@/components/DashboardActions";
 import { sql, eq, and } from "drizzle-orm";
 import { addExpense } from "@/app/actions";
+import { DownloadFinanceButton } from "@/components/DownloadFinanceButton";
 
 
 export default async function FinancePage() {
-    const allMovements = await db.select().from(expenses).where(eq(expenses.isExcludedFromStats, false));
+    // Only show non-archived expenses
+    const allMovements = await db.select().from(expenses).where(eq(expenses.isArchived, false));
 
     const totalExpenses = allMovements
         .filter(m => m.type === 'expense')
@@ -29,11 +32,16 @@ export default async function FinancePage() {
     return (
         <div className="min-h-screen bg-background p-8">
             <div className="max-w-5xl mx-auto">
-                <div className="mb-6 flex items-center gap-4">
-                    <Link href="/" className="p-2 -ml-2 text-muted-foreground hover:text-primary hover:bg-primary/5 rounded-full transition-colors">
-                        <ArrowLeft size={24} />
+                <div className="mb-6 flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                        <Link href="/" className="p-2 -ml-2 text-muted-foreground hover:text-primary hover:bg-primary/5 rounded-full transition-colors">
+                            <ArrowLeft size={24} />
+                        </Link>
+                        <h1 className="text-2xl font-bold text-primary">Gestión Financiera</h1>
+                    </div>
+                    <Link href="/bookings" className="bg-secondary text-secondary-foreground px-4 py-2 rounded-md flex items-center gap-2 hover:bg-secondary/80 transition-colors shadow-sm font-medium text-sm">
+                        <CalendarIcon size={16} /> Reservas
                     </Link>
-                    <h1 className="text-2xl font-bold text-primary">Gestión Financiera</h1>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
@@ -71,24 +79,6 @@ export default async function FinancePage() {
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                    {/* List */}
-                    <div className="lg:col-span-2 space-y-4">
-                        <h3 className="font-semibold text-lg text-foreground mb-2">Movimientos Recientes</h3>
-                        {allMovements.length === 0 ? (
-                            <div className="bg-card p-8 rounded-xl border border-dashed border-border text-center">
-                                <p className="text-muted-foreground">No hay movimientos registrados.</p>
-                            </div>
-                        ) : (
-                            allMovements.sort((a, b) => (b.date?.getTime() || 0) - (a.date?.getTime() || 0)).map((movement) => (
-                                <ExpenseItem key={movement.id} expense={{
-                                    ...movement,
-                                    type: movement.type as any
-                                }} />
-                            ))
-
-                        )}
-                    </div>
-
                     {/* Form */}
                     <div className="bg-card p-6 rounded-xl border border-border shadow-sm h-fit">
                         <h3 className="font-semibold text-lg mb-4 text-primary">Nuevo Movimiento</h3>
@@ -105,21 +95,10 @@ export default async function FinancePage() {
                                 <input name="description" type="text" required className="w-full border border-border rounded-md p-2 text-sm bg-background text-foreground" placeholder="Ej: Vuelo de globos, Limpieza..." />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-foreground mb-1">Categoría</label>
-                                <select name="category" className="w-full border border-border rounded-md p-2 text-sm bg-background text-foreground">
-                                    <option>Mantenimiento</option>
-                                    <option>Insumos</option>
-                                    <option>Servicios</option>
-                                    <option>Ventas</option>
-                                    <option>Alquiler</option>
-                                    <option>Otros</option>
-                                </select>
-                            </div>
-                            <div>
                                 <label className="block text-sm font-medium text-foreground mb-1">Monto</label>
                                 <div className="relative">
                                     <span className="absolute left-2 top-2 text-muted-foreground">$</span>
-                                    <input name="amount" type="number" required className="w-full border border-border rounded-md p-2 pl-6 text-sm bg-background text-foreground" placeholder="100" />
+                                    <input name="amount" type="number" min="0" required className="w-full border border-border rounded-md p-2 pl-6 text-sm bg-background text-foreground" placeholder="100" />
                                 </div>
                             </div>
                             <button type="submit" className="w-full bg-primary text-primary-foreground py-2 rounded-md hover:bg-primary/90 transition-colors shadow-md">
@@ -127,6 +106,33 @@ export default async function FinancePage() {
                             </button>
 
                         </form>
+                    </div>
+
+                    {/* List */}
+                    <div className="lg:col-span-2 space-y-4">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-2">
+                            <h3 className="font-semibold text-lg text-foreground">Movimientos Recientes</h3>
+                            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                                <DownloadFinanceButton movements={allMovements.map(m => ({
+                                    ...m,
+                                    type: m.type as 'income' | 'expense'
+                                }))} />
+                                <ClearFinanceListButton />
+                            </div>
+                        </div>
+                        {allMovements.length === 0 ? (
+                            <div className="bg-card p-8 rounded-xl border border-dashed border-border text-center">
+                                <p className="text-muted-foreground">No hay movimientos registrados.</p>
+                            </div>
+                        ) : (
+                            allMovements.sort((a, b) => (b.date?.getTime() || 0) - (a.date?.getTime() || 0)).map((movement) => (
+                                <ExpenseItem key={movement.id} expense={{
+                                    ...movement,
+                                    type: movement.type as any
+                                }} />
+                            ))
+
+                        )}
                     </div>
                 </div>
             </div>

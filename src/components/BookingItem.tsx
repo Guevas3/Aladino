@@ -26,6 +26,7 @@ type Booking = {
     depositAmount: string;
     totalAmount: string;
     status: string | null;
+    observations?: string | null;
 };
 
 export function BookingItem({ booking, compact = false }: { booking: Booking, compact?: boolean }) {
@@ -93,6 +94,11 @@ export function BookingItem({ booking, compact = false }: { booking: Booking, co
                     <span className="flex items-center gap-1 whitespace-nowrap"><CalendarIcon size={12} /> {format(new Date(booking.date), "P")}</span>
                     <span className="flex items-center gap-1 whitespace-nowrap"><Clock size={12} /> {booking.timeSlot}</span>
                 </div>
+                {booking.observations && (
+                    <div className="mt-2 text-xs text-muted-foreground bg-muted/20 p-2 rounded-md border border-border/50 italic">
+                        "{booking.observations}"
+                    </div>
+                )}
             </div>
 
             <div className={cn(

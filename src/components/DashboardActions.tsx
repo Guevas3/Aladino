@@ -1,8 +1,9 @@
 "use client";
 
 import { RotateCcw, EyeOff } from "lucide-react";
-import { clearRecentBookings, resetFinancialStats } from "@/app/actions";
+import { clearRecentBookings, resetFinancialStats, clearRecentExpenses, clearBookingHistory } from "@/app/actions";
 import { useState } from "react";
+import { History } from "lucide-react";
 
 export function ClearListButton() {
     const [isPending, setIsPending] = useState(false);
@@ -25,6 +26,56 @@ export function ClearListButton() {
             title="Limpiar visualmente la lista"
         >
             <EyeOff size={14} /> Limpiar Lista
+        </button>
+    );
+}
+
+export function ClearFinanceListButton() {
+    const [isPending, setIsPending] = useState(false);
+
+    async function handleClear() {
+        if (!confirm("¿Limpiar la lista de movimientos recientes? No afectará los totales.")) return;
+        setIsPending(true);
+        try {
+            await clearRecentExpenses();
+        } finally {
+            setIsPending(false);
+        }
+    }
+
+    return (
+        <button
+            onClick={handleClear}
+            disabled={isPending}
+            className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-destructive transition-colors disabled:opacity-50"
+            title="Limpiar visualmente la lista"
+        >
+            <EyeOff size={14} /> Limpiar Lista
+        </button>
+    );
+}
+
+export function ClearHistoryButton() {
+    const [isPending, setIsPending] = useState(false);
+
+    async function handleClear() {
+        if (!confirm("¿Archivar reservas pasadas y completadas? Las reservas futuras y confirmadas permanecerán visibles.")) return;
+        setIsPending(true);
+        try {
+            await clearBookingHistory();
+        } finally {
+            setIsPending(false);
+        }
+    }
+
+    return (
+        <button
+            onClick={handleClear}
+            disabled={isPending}
+            className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-primary transition-colors disabled:opacity-50"
+            title="Ocultar reservas pasadas"
+        >
+            <History size={14} /> Limpiar Historial
         </button>
     );
 }
