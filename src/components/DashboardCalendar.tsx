@@ -12,7 +12,7 @@ type Booking = {
     clientName: string;
     date: Date;
     timeSlot: string;
-    status: string;
+    status: string | null;
     totalAmount: string;
     depositAmount: string;
 };
@@ -110,7 +110,7 @@ export function DashboardCalendar({ bookings }: { bookings: Booking[] }) {
                                             <span>{booking.timeSlot}</span>
                                         </div>
                                         <span className="text-xs px-2 py-0.5 bg-secondary/20 text-secondary-foreground rounded-full">
-                                            {booking.status}
+                                            {booking.status ?? 'pending'}
                                         </span>
                                     </div>
                                 </div>
